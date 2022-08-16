@@ -1,0 +1,19 @@
+{
+  "name": "@scrappi-io/microservices-connector",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Scrappi-io/micorservices-connector.git"
+  },
+  "author": "alkhachatryan",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Scrappi-io/micorservices-connector/issues"
+  },
+  "homepage": "https://github.com/Scrappi-io/micorservices-connector#readme"
+}
