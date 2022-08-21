@@ -1,9 +1,11 @@
 const { Kafka } = require('kafkajs');
 const axios = require('axios');
 const path = require('path');
+const express = require('express');
+const protectedCrossServiceRequest = require('./middlewares/protectedCrossServiceRequest');
 
 class Connector {
-  constructor(app, config) {
+  constructor(app, config, actions) {
     this.kafka = new Kafka({
       clientId: config.kafka.clientId,
       brokers: [config.kafka.host],
@@ -11,6 +13,31 @@ class Connector {
     this.kafkaProducer = this.kafka.producer();
     this.app = app;
     this.config = config;
+    this.app.microservicesConfig = config;
+    this.actions = actions;
+    this.app.use('/', this.buildServicesRoutes());
+  }
+
+  async consume(groupId, topic, callback) {
+    const consumer = this.kafka.consumer({ groupId });
+    await consumer.connect();
+    await consumer.subscribe({ topic, fromBeginning: true });
+
+    consumer.on('consumer.crash', async (event) => {
+      const { error } = event.payload;
+
+      if (error && error.name !== 'KafkaJSNumberOfRetriesExceeded' && error.retriable !== true) {
+        await consumer.disconnect();
+        await consumer.connect();
+        await consumer.subscribe({ topic, fromBeginning: true });
+      }
+    });
+
+    await consumer.run({
+      eachMessage: async ({ message }) => {
+        callback(JSON.parse(message.value.toString()));
+      },
+    });
   }
 
   async produce(topic, key, value) {
@@ -28,23 +55,23 @@ class Connector {
     await this.kafkaProducer.disconnect();
   }
 
-  async consume(groupId, topic, callback) {
-    const consumer = this.kafka.consumer({ groupId });
-    await consumer.connect();
-    await consumer.subscribe({ topic, fromBeginning: true });
-
-    await consumer.run({
-      eachMessage: async ({ message }) => {
-        callback(JSON.parse(message.value.toString()));
-      },
-    });
+  async produceSync(topic, key, value) {
+    const serviceHost = this.config.services[topic].host;
+    const headers = { 'CROSS-SERVICE-TOKEN': this.config.crossServiceToken };
+    const requestUrl = `http://${path.join(serviceHost, `_service/${key}`)}`;
+    return axios.post(requestUrl, value, { headers });
   }
 
-  async produceSync(service, key, value) {
-    const serviceHost = this.config.services[service].host;
-
-    // eslint-disable-next-line no-return-await
-    return axios.post(path.join(serviceHost, key), value);
+  buildServicesRoutes() {
+    const router = express.Router();
+    const { actions, config } = this;
+    if (typeof actions === 'undefined' || actions === null) {
+      return router;
+    }
+    Object.keys(actions).forEach(function (key) {
+      router.post(`/_service/${key}`, protectedCrossServiceRequest(config), actions[key]);
+    });
+    return router;
   }
 }
 
