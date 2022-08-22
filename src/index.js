@@ -5,7 +5,7 @@ const express = require('express');
 const protectedCrossServiceRequest = require('./middlewares/protectedCrossServiceRequest');
 
 class Connector {
-  constructor(app, config, actions) {
+  constructor(app, config, consumerActions) {
     this.kafka = new Kafka({
       clientId: config.kafka.clientId,
       brokers: [config.kafka.host],
@@ -14,7 +14,8 @@ class Connector {
     this.app = app;
     this.config = config;
     this.app.microservicesConfig = config;
-    this.actions = actions;
+    this.consumerActions = consumerActions;
+    this.handleJSONRequests();
     this.app.use('/', this.buildServicesRoutes());
   }
 
@@ -56,22 +57,31 @@ class Connector {
   }
 
   async produceSync(topic, key, value) {
+    console.log('aaaaaaaaaaaa', value)
     const serviceHost = this.config.services[topic].host;
-    const headers = { 'CROSS-SERVICE-TOKEN': this.config.crossServiceToken };
+    const headers = {
+      'CROSS-SERVICE-TOKEN': this.config.crossServiceToken,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
     const requestUrl = `http://${path.join(serviceHost, `_service/${key}`)}`;
     return axios.post(requestUrl, value, { headers });
   }
 
   buildServicesRoutes() {
     const router = express.Router();
-    const { actions, config } = this;
-    if (typeof actions === 'undefined' || actions === null) {
+    const { consumerActions, config } = this;
+    if (typeof consumerActions === 'undefined' || consumerActions === null) {
       return router;
     }
-    Object.keys(actions).forEach(function (key) {
-      router.post(`/_service/${key}`, protectedCrossServiceRequest(config), actions[key]);
+    Object.keys(consumerActions).forEach(function (key) {
+      router.post(`/_service/${key}`, protectedCrossServiceRequest(config), consumerActions[key]);
     });
     return router;
+  }
+
+  handleJSONRequests() {
+    this.app.use(express.json());
   }
 }
 
