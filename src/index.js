@@ -1,4 +1,4 @@
-const { Kafka } = require('kafkajs');
+const { Kafka, Partitioners } = require('kafkajs');
 const axios = require('axios');
 const path = require('path');
 const express = require('express');
@@ -10,7 +10,7 @@ class Connector {
       clientId: config.kafka.clientId,
       brokers: [config.kafka.host],
     });
-    this.kafkaProducer = this.kafka.producer();
+    this.kafkaProducer = this.kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
     this.app = app;
     this.config = config;
     this.app.microservicesConfig = config;
@@ -56,8 +56,7 @@ class Connector {
     await this.kafkaProducer.disconnect();
   }
 
-  async produceSync(topic, key, value) {
-    console.log('aaaaaaaaaaaa', value)
+  async httpRequest(topic, key, value) {
     const serviceHost = this.config.services[topic].host;
     const headers = {
       'CROSS-SERVICE-TOKEN': this.config.crossServiceToken,
@@ -65,6 +64,7 @@ class Connector {
       'Content-Type': 'application/json',
     };
     const requestUrl = `http://${path.join(serviceHost, `_service/${key}`)}`;
+
     return axios.post(requestUrl, value, { headers });
   }
 
