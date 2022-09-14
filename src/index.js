@@ -11,12 +11,14 @@ class Connector {
       brokers: [config.kafka.host],
     });
     this.kafkaProducer = this.kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
-    this.app = app;
+    this.app = app || {};
     this.config = config;
     this.app.microservicesConfig = config;
     this.consumerActions = consumerActions;
-    this.handleJSONRequests();
-    this.app.use('/', this.buildServicesRoutes());
+    if (app) {
+      this.app.use('/', this.buildServicesRoutes());
+      this.handleJSONRequests();
+    }
   }
 
   async consume(groupId, topic, callback) {
