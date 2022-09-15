@@ -16,8 +16,8 @@ class Connector {
     this.app.microservicesConfig = config;
     this.consumerActions = consumerActions;
     if (app) {
-      this.app.use('/', this.buildServicesRoutes());
       this.handleJSONRequests();
+      this.app.use('/', this.buildServicesRoutes());
     }
   }
 
